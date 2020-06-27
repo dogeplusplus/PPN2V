@@ -13,7 +13,7 @@ from torch.nn import init
 import numpy as np
 import torchvision
 
-from unet.model import UNet
+from models.unet_pytorch import UNet
 import pn2v.utils
 
 def createHistogram(bins, minVal ,maxVal ,observation,signal):

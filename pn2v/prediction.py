@@ -68,7 +68,7 @@ def predict(im, net, noiseModel, device, outScaling):
         mseEst = torch.sum(likelihoods*samples,dim=0,keepdim=True)[0,...] # Sum up over all samples
         mseEst/= torch.sum(likelihoods,dim=0,keepdim=True)[0,...] # Normalize
 
-        # Get data from GPU
+        # Get image from GPU
         mseEst=mseEst.cpu().detach().numpy()
         mseEst.shape=(output.shape[2],output.shape[3])
         return means,mseEst

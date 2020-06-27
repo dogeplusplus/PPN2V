@@ -78,7 +78,7 @@ def plotProbabilityDistribution(signalBinIndex, histogram, gaussianMixtureNoiseM
         signalBinIndex: int
             index of signal bin. Values go from 0 to number of bins (`n_bin`).
         histogram: numpy array
-            A square numpy array of size `nbin` times `n_bin`.
+            A square numpy array of patch_size `nbin` times `n_bin`.
         gaussianMixtureNoiseModel: GaussianMixtureNoiseModel
             Object containing trained parameters.
         min_signal: float

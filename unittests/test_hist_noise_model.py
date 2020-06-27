@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 
-from pn2v_tf.hist_noise_model import create_histogram, NoiseModel
+from noise_models.hist_noise_model import create_histogram, NoiseModel
 
 
 @pytest.fixture
@@ -18,12 +18,12 @@ def noise_model(histogram):
 
 
 def test_create_histogram(histogram):
-    assert histogram.shape == (32, 32)
+    assert histogram.shape == (3, 32, 32)
 
 
 def test_likelihood(noise_model):
-    observation = np.ones((18, 64, 64))
-    signal = np.ones((18, 64, 64))
+    observation = np.ones((18, 64, 64), np.float64)
+    signal = np.ones((18, 64, 64), np.float64)
 
     likely = noise_model.likelihood(observation, signal)
     assert likely.shape == observation.shape
