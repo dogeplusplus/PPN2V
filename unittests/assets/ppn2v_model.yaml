@@ -1,6 +1,7 @@
-type: "pn2v"
+type: pn2v
 depth: 3
 num_classes: 800
 patch_size: 64
 initial_filters: 64
-noise_model_path: "unittests/assets/noiseModel.npy"
+noise_model_path: unittests/assets/noiseModel.npy
+model_path: model_instances/cheese

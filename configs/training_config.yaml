@@ -1,5 +1,6 @@
-epochs: 10
+epochs: 5
 steps_per_epoch: 2
-patch_size: 64
+patch_size: 128
 virtual_batch_size: 20
 batch_size: 4
+model_path: model_instances/cheese

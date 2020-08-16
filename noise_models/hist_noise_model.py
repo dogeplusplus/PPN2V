@@ -117,6 +117,7 @@ class NoiseModel:
 
         # Finally we are looking up the values and interpolate
         # TODO: this seems to work but is ugly and quite slow
+        # TODO: [4,120, 120,1] vs [4, 120, 120] add operation fails here when training
         raw_indices = 256 * signal_ + obs_
         converted_indices = tf.reshape(
             tf.unravel_index(

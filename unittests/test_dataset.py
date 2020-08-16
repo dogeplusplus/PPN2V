@@ -1,10 +1,12 @@
 import numpy as np
+import tensorflow as tf
 
 from utils.dataset import manipulate_pixels
 
 def test_manipulate_pixels():
     random_image = np.array([i for i in range(100)]).reshape((10, 10))
-    images, labels, masks = manipulate_pixels(random_image, 5)
+    random_image_tf = tf.convert_to_tensor(random_image)
+    images, labels, masks = manipulate_pixels(random_image_tf, 5)
 
     # Check the output shapes are the same
     assert random_image.shape == images.shape

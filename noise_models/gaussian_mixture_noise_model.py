@@ -275,7 +275,6 @@ class GaussianMixtureNoiseModel:
 
 
         """
-        # TODO: change the training loop here
         sig_obs_pairs = self.get_signal_observation_pairs(
             signal, observation, lowerClip, upperClip
         )
