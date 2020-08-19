@@ -22,8 +22,15 @@ def test_create_histogram(histogram):
 
 
 def test_likelihood(noise_model):
-    observation = np.ones((18, 64, 64), np.float64)
-    signal = np.ones((18, 64, 64), np.float64)
+    observation = np.ones((18, 64, 64), np.float32)
+    signal = np.ones((18, 64, 64), np.float32)
+
+    likely = noise_model.likelihood(observation, signal)
+    assert likely.shape == observation.shape
+
+def test_likelihood_extra_dim(noise_model):
+    observation = np.ones((18, 64, 64, 1), np.float32)
+    signal = np.ones((18, 64, 64, 1), np.float32)
 
     likely = noise_model.likelihood(observation, signal)
     assert likely.shape == observation.shape

@@ -50,7 +50,7 @@ def create_histogram(bins, min_val, max_val, observation, signal):
 
     for i in range(bins):
         if (
-            np.sum(histogram[0, i, :]) > 1e-20
+                np.sum(histogram[0, i, :]) > 1e-20
         ):  # We exclude empty rows from normalization
             histogram[0, i, :] /= np.sum(
                 histogram[0, i, :]
@@ -58,11 +58,11 @@ def create_histogram(bins, min_val, max_val, observation, signal):
 
     for i in range(bins):
         histogram[1, :, i] = a[1][
-            :-1
-        ]  # The lower boundaries of each bin in y are stored in dimension 1
+                             :-1
+                             ]  # The lower boundaries of each bin in y are stored in dimension 1
         histogram[2, :, i] = a[1][
-            1:
-        ]  # The upper boundaries of each bin in y are stored in dimension 2
+                             1:
+                             ]  # The upper boundaries of each bin in y are stored in dimension 2
         # The accordent numbers for x are just transopsed.
 
     return histogram
@@ -109,6 +109,8 @@ class NoiseModel:
         ----------
         Torch tensor containing the observation likelihoods according to the noise model.
         """
+        # print(obs.get_shape())
+        # print(signal.get_shape())
         obsF = self.get_index_obs_float(obs)
         obs_ = tf.cast(tf.math.floor(obsF), tf.int32)
         signalF = self.get_index_signal_float(signal)
@@ -118,16 +120,21 @@ class NoiseModel:
         # Finally we are looking up the values and interpolate
         # TODO: this seems to work but is ugly and quite slow
         # TODO: [4,120, 120,1] vs [4, 120, 120] add operation fails here when training
-        raw_indices = 256 * signal_ + obs_
+        # TODO: rethink how the likelihood is calculated for each sample.
+        # The array should not be reduced, the reduce_mean should happen in the loss calculation
+        # print(signal_.get_shape())
+        # print(obs_.get_shape())
+        raw_indices = tf.broadcast_to(256 * signal_, obs_.get_shape()) + obs_
         converted_indices = tf.reshape(
             tf.unravel_index(
                 tf.reshape(raw_indices, [-1]), dims=self.full_hist.get_shape()
+
             ),
             raw_indices.get_shape() + [2],
         )
         x0 = tf.gather_nd(self.full_hist, converted_indices)
 
-        second_indices = tf.clip_by_value(signal_ + 1, 0, self.bins)
+        second_indices = tf.broadcast_to(tf.clip_by_value(signal_ + 1, 0, self.bins), obs_.get_shape()) + obs_
         converted_indices_2 = tf.reshape(
             tf.unravel_index(
                 tf.reshape(second_indices, [-1]), dims=self.full_hist.get_shape()
@@ -135,7 +142,9 @@ class NoiseModel:
             second_indices.get_shape() + [2],
         )
         x1 = tf.gather_nd(self.full_hist, converted_indices_2)
-        return x0 * (1.0 - fact) + x1 * fact
+        a = x0 * (1.0 - tf.broadcast_to(fact, x0.get_shape()))
+        b = x1 * tf.broadcast_to(fact, x1.get_shape())
+        return a + b
 
     def get_index_obs_float(self, x):
         return tf.clip_by_value(

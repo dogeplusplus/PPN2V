@@ -64,7 +64,6 @@ class PPN2V(Model):
     def _validate_step(self, inputs: tf.Tensor, labels: tf.Tensor, masks: tf.Tensor,
                        loss_tensor: tf.keras.metrics.Mean,
                        training: bool = False) -> float:
-
         samples = self.call(inputs, training=training)
         loss = self.loss_fn(samples, labels, masks)
         loss_tensor.update_state(loss)
@@ -83,13 +82,14 @@ class PPN2V(Model):
         """
         The loss function as described in Eq. 7 of the paper.
         """
-
+        labels = tf.transpose(labels, (3, 0, 1, 2))
+        masks = tf.transpose(masks, (3, 0, 1, 2))
         likelihoods = self.noise_model.likelihood(labels, samples)
         likelihoods_avg = tf.math.log(
             tf.reduce_mean(likelihoods, axis=0, keepdims=True)[0, ...])
 
         # Average over pixels and batch
-        masks = tf.squeeze(masks)
+        masks = tf.cast(tf.squeeze(masks), tf.float32)
         loss = -tf.reduce_sum(likelihoods_avg * masks) / tf.reduce_sum(masks)
         return loss
 
@@ -193,12 +193,12 @@ class PPN2V(Model):
         outputs = self.unet(model_inputs, training=training) * 10.0
 
         samples = tf.transpose(outputs, (3, 0, 1, 2))
+        transposed_inputs = tf.transpose(inputs, (3, 0, 1, 2))
         # Denormalize
         samples = samples * self.std + self.mean
-        samples = tf.reduce_mean(samples, axis=0)
-
-        # TODO: check if this indexing fixes the training
-        likelihoods = self.noise_model.likelihood(samples, inputs)
+        # TODO: check if commenting this out fixes things
+        # samples = tf.reduce_mean(samples, axis=0)[..., tf.newaxis]
+        likelihoods = self.noise_model.likelihood(samples, transposed_inputs)
         mse_est = likelihoods * samples
         mse_est /= tf.reduce_sum(likelihoods)
         return mse_est
