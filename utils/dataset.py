@@ -32,9 +32,9 @@ def manipulate_pixels(image, num_pix):
     label = image
     max_a = image.shape[1] - 1
     max_b = image.shape[0] - 1
-    mask = np.zeros(image.shape, dtype=np.uint16)
+    mask = np.zeros(image.shape, dtype=np.uint8)
     hot_pixels = stratified_coords_2d(num_pix, image.shape)
-    repl_grid = np.zeros(image.shape, dtype=np.uint16)
+    repl_grid = np.zeros(image.shape, dtype=np.uint8)
     for p in hot_pixels:
         a, b = p[1], p[0]
 
@@ -51,7 +51,7 @@ def manipulate_pixels(image, num_pix):
 
         repl = roi[b_, a_]
         repl_grid[b, a] = repl
-        mask[b, a] = 1.0
+        mask[b, a] = 1
     return tf.where(mask > 0, repl_grid, image), label, mask
 
 
@@ -81,40 +81,6 @@ def tf_augmentation(image, label, mask):
                                           [tf.float32, tf.float32, tf.float32])
     return image, label, mask
 
-
-def load_data(data_array: np.array, batch_size: int, patch_size: int, num_pix: int,
-              supervised: bool = False,
-              augment: bool = True) -> Tuple[tf.data.Dataset, float, float]:
-    dataset = tf.data.Dataset.from_tensor_slices(data_array)
-
-    # TODO: deal with this hacky nonsense for the random crop
-    # Crop first
-    dataset = dataset.map(lambda x: tf.squeeze(
-        tf.image.random_crop(x[..., tf.newaxis], (patch_size, patch_size, 1))))
-    if supervised:
-        images = dataset.map(lambda x: x[..., 0])
-        labels = dataset.map(lambda x: x[..., 1])
-        masks = dataset.map(lambda x: tf.ones_like(x))
-        combined_dataset = tf.data.Dataset.zip((images, labels, masks))
-    else:
-        combined_dataset = dataset.map(lambda x: manipulate_pixels_tf(x, num_pix))
-
-    if augment:
-        combined_dataset = combined_dataset.map(tf_augmentation)
-
-    # TODO: check if shuffle buffer is necessary
-    # combined_dataset = combined_dataset.shuffle(buffer_size=100)
-    combined_dataset = combined_dataset.shuffle(buffer_size=10)
-    combined_dataset = combined_dataset.batch(batch_size)
-    combined_dataset = combined_dataset.prefetch(tf.data.experimental.AUTOTUNE)
-
-    # Return dataset with mean and std:
-    mean = np.mean(data_array)
-    std = np.std(data_array)
-
-    return combined_dataset, mean, std
-
-
 def _bytes_feature(value):
     """Returns a bytes_list from a string / byte."""
     if isinstance(value, type(tf.constant(0))):
@@ -134,9 +100,9 @@ def _int64_feature(value):
 
 def features2example(image, label, mask):
     features = {
-        'image': _bytes_feature(tf.image.encode_png(image)),
-        'label': _bytes_feature(tf.image.encode_png(label)),
-        'mask': _bytes_feature(tf.image.encode_png(mask))
+        'image': _bytes_feature(tf.image.encode_png(image, compression=1)),
+        'label': _bytes_feature(tf.image.encode_png(label, compression=1)),
+        'mask': _bytes_feature(tf.image.encode_png(mask, compression=1))
     }
     proto = tf.train.Example(features=tf.train.Features(feature=features))
     return proto.SerializeToString()
@@ -150,9 +116,9 @@ def _parse_function(feature):
     }
     parsed = tf.io.parse_single_example(feature, feature_description)
     features = {
-        'image': tf.cast(tf.io.decode_image(parsed['image']), tf.float32),
-        'label': tf.io.decode_image(parsed['label']),
-        'mask': tf.io.decode_image(parsed['mask'])
+        'image': tf.cast(tf.io.decode_png(parsed['image'], channels=1), tf.float32),
+        'label': tf.io.decode_png(parsed['label'], channels=1),
+        'mask': tf.io.decode_png(parsed['mask'], channels=1)
     }
     return features
 
@@ -212,7 +178,6 @@ def create_dataset(data_path, iterations, num_pix, destination, patch_size=120,
     with open(os.path.join(destination, config_file), 'w') as f:
         yaml.dump(dataset_config, f)
 
-
 def load_dataset(records_path, batch_size=4, shuffle_buffer=100):
     train_records = glob.glob(f'{records_path}/train_*.tfrecord')
     val_records = glob.glob(f'{records_path}/valid_*.tfrecord')
@@ -226,6 +191,7 @@ def load_dataset(records_path, batch_size=4, shuffle_buffer=100):
 
     for name in datasets.keys():
         datasets[name] = datasets[name].map(_parse_function)
+        datasets[name] = datasets[name].map(tf_augmentation)
         datasets[name] = datasets[name].shuffle(buffer_size=shuffle_buffer)
         datasets[name] = datasets[name].prefetch(tf.data.experimental.AUTOTUNE)
         datasets[name] = datasets[name].batch(batch_size)
@@ -238,7 +204,7 @@ def load_dataset(records_path, batch_size=4, shuffle_buffer=100):
 
 if __name__ == "__main__":
     path = "data/Confocal_MICE/raw/training_raw.npy"
-    iterate = 100
+    iterate = 10
     pixels = 100
     images_per_record = 1000
     destination = 'data/test_records'

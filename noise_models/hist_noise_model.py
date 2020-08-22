@@ -109,53 +109,28 @@ class NoiseModel:
         ----------
         Torch tensor containing the observation likelihoods according to the noise model.
         """
-        # print(obs.get_shape())
-        # print(signal.get_shape())
-        obsF = self.get_index_obs_float(obs)
+        # TODO: Gradients are not coming through, figure out what the non-differentiable bit is
+        obsF = self.get_index_float(obs)
         obs_ = tf.cast(tf.math.floor(obsF), tf.int32)
-        signalF = self.get_index_signal_float(signal)
+        signalF = self.get_index_float(signal)
         signal_ = tf.cast(tf.math.floor(signalF), tf.int32)
         fact = signalF - tf.cast(signal_, tf.float32)
 
-        # Finally we are looking up the values and interpolate
-        # TODO: this seems to work but is ugly and quite slow
-        # TODO: [4,120, 120,1] vs [4, 120, 120] add operation fails here when training
-        # TODO: rethink how the likelihood is calculated for each sample.
-        # The array should not be reduced, the reduce_mean should happen in the loss calculation
-        # print(signal_.get_shape())
-        # print(obs_.get_shape())
-        raw_indices = tf.broadcast_to(256 * signal_, obs_.get_shape()) + obs_
-        converted_indices = tf.reshape(
-            tf.unravel_index(
-                tf.reshape(raw_indices, [-1]), dims=self.full_hist.get_shape()
+        # Finally we are looking ud the values and interpolate
+        lower = tf.stack([tf.broadcast_to(256 * signal_, obs_.get_shape()), obs_], axis=-1)
+        x0 = tf.gather_nd(self.full_hist, lower)
 
-            ),
-            raw_indices.get_shape() + [2],
-        )
-        x0 = tf.gather_nd(self.full_hist, converted_indices)
-
-        second_indices = tf.broadcast_to(tf.clip_by_value(signal_ + 1, 0, self.bins), obs_.get_shape()) + obs_
-        converted_indices_2 = tf.reshape(
-            tf.unravel_index(
-                tf.reshape(second_indices, [-1]), dims=self.full_hist.get_shape()
-            ),
-            second_indices.get_shape() + [2],
-        )
-        x1 = tf.gather_nd(self.full_hist, converted_indices_2)
-        a = x0 * (1.0 - tf.broadcast_to(fact, x0.get_shape()))
-        b = x1 * tf.broadcast_to(fact, x1.get_shape())
+        upper = tf.stack(
+            [tf.broadcast_to(tf.clip_by_value(signal_ + 1, 0, self.bins), obs_.get_shape()), obs_], axis = -1)
+        x1 = tf.gather_nd(self.full_hist, upper)
+        a = x0 * (1.0 - fact)
+        b = x1 * fact
         return a + b
 
-    def get_index_obs_float(self, x):
+    def get_index_float(self, x):
         return tf.clip_by_value(
             self.bins * (x - self.minv) / (self.maxv - self.minv),
             clip_value_min=0.0,
             clip_value_max=self.bins - 1 - 1e-3,
         )
 
-    def get_index_signal_float(self, x):
-        return tf.clip_by_value(
-            self.bins * (x - self.minv) / (self.maxv - self.minv),
-            clip_value_min=0.0,
-            clip_value_max=self.bins - 1 - 1e-3,
-        )

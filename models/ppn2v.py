@@ -60,16 +60,16 @@ class PPN2V(Model):
 
         return inputs_raw, labels, masks
 
-    @tf.function
+    # @tf.function
     def _validate_step(self, inputs: tf.Tensor, labels: tf.Tensor, masks: tf.Tensor,
                        loss_tensor: tf.keras.metrics.Mean,
                        training: bool = False) -> float:
-        samples = self.call(inputs, training=training)
-        loss = self.loss_fn(samples, labels, masks)
+        predictions = self.call(inputs, training=training)
+        loss = self.loss_fn(predictions, labels, masks)
         loss_tensor.update_state(loss)
         return loss
 
-    @tf.function
+    # @tf.function
     def _train_step(self, inputs: tf.Tensor, labels: tf.Tensor, masks: tf.Tensor,
                     loss_tensor=tf.keras.metrics.Mean) -> float:
         with tf.GradientTape() as tape:
@@ -78,15 +78,12 @@ class PPN2V(Model):
         self.optimizer.apply_gradients(zip(gradients, self.unet.trainable_variables))
         return loss
 
-    def loss_pn2v(self, samples, labels, masks):
+    def loss_pn2v(self, predictions, labels, masks):
         """
         The loss function as described in Eq. 7 of the paper.
         """
-        labels = tf.transpose(labels, (3, 0, 1, 2))
-        masks = tf.transpose(masks, (3, 0, 1, 2))
-        likelihoods = self.noise_model.likelihood(labels, samples)
-        likelihoods_avg = tf.math.log(
-            tf.reduce_mean(likelihoods, axis=0, keepdims=True)[0, ...])
+        likelihoods = self.noise_model.likelihood(predictions, labels)
+        likelihoods_avg = tf.math.log(tf.reduce_mean(likelihoods, axis=-1))
 
         # Average over pixels and batch
         masks = tf.cast(tf.squeeze(masks), tf.float32)
@@ -192,13 +189,10 @@ class PPN2V(Model):
         # We found that this factor can speed up training
         outputs = self.unet(model_inputs, training=training) * 10.0
 
-        samples = tf.transpose(outputs, (3, 0, 1, 2))
-        transposed_inputs = tf.transpose(inputs, (3, 0, 1, 2))
+        samples = outputs
         # Denormalize
         samples = samples * self.std + self.mean
-        # TODO: check if commenting this out fixes things
-        # samples = tf.reduce_mean(samples, axis=0)[..., tf.newaxis]
-        likelihoods = self.noise_model.likelihood(samples, transposed_inputs)
+        likelihoods = self.noise_model.likelihood(samples, inputs)
         mse_est = likelihoods * samples
         mse_est /= tf.reduce_sum(likelihoods)
         return mse_est
